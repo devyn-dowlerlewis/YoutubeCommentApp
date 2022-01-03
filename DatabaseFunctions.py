@@ -1,8 +1,5 @@
-import requests
 import pandas as pd
-import time
 import psycopg2 as ps
-
 
 # Connect to the Database
 def connect_to_db(host_name, dbname, username, password, port):
@@ -85,7 +82,7 @@ def insert_into_table(curr, video_id, video_title, channel_title, upload_date, v
 def create_comment_table(curr):
     create_table_command = ("""CREATE TABLE IF NOT EXISTS comments (
                         key VARCHAR(255) PRIMARY KEY,
-                        videoId VARCHAR(255) NOT NULL,
+                        videoid VARCHAR(255) NOT NULL,
                         author VARCHAR(255) NOT NULL,
                         display_name TEXT NOT NULL,
                         comment TEXT NOT NULL,
@@ -96,12 +93,12 @@ def create_comment_table(curr):
 
 
 def update_comment_db(curr, comdf):
-    temp_df = pd.DataFrame(columns=['key', 'videoId', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
+    temp_df = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
     up_count = 0
     new_count = 0
     for i, row in comdf.iterrows():
         if check_if_comment_exists(curr, row['key']):
-            update_comment_row(curr, row['key'], row['videoId'], row['author'], row['display_name'], row['comment'],
+            update_comment_row(curr, row['key'], row['videoid'], row['author'], row['display_name'], row['comment'],
                                row['like_count'], row['upload_date'])
             up_count = up_count + 1
         else:
@@ -115,7 +112,7 @@ def update_comment_db(curr, comdf):
     return temp_df
 
 
-def update_comment_row(curr, key, videoId, author, display_name, comment, like_count, upload_date):
+def update_comment_row(curr, key, i, author, display_name, comment, like_count, upload_date):
     query = ("""UPDATE comments
         SET display_name = %s,
             comment = %s,
@@ -135,15 +132,21 @@ def check_if_comment_exists(curr, key):
 def append_from_comdf_to_db(curr, comdf):
     i = 0
     for i, row in comdf.iterrows():
-        insert_comment_into_table(curr, row['key'], row['videoId'], row['author'], row['display_name'], row['comment'],
+        insert_comment_into_table(curr, row['key'], row['videoid'], row['author'], row['display_name'], row['comment'],
                                   row['like_count'], row['upload_date'])
         if ((i + 1) % 500 == 0):
             print('New Comments Inserted: ', i + 1)
 
 
-def insert_comment_into_table(curr, key, videoId, author, display_name, comment, like_count, upload_date):
-    insert_into_comments = ("""INSERT INTO comments (key, videoId, author, display_name, comment, like_count, upload_date)
+def insert_comment_into_table(curr, key, videoid, author, display_name, comment, like_count, upload_date):
+    insert_into_comments = ("""INSERT INTO comments (key, videoid, author, display_name, comment, like_count, upload_date)
         VALUES(%s,%s,%s,%s,%s,%s,%s);""")
 
-    row_to_insert = (key, videoId, author, display_name, comment, like_count, upload_date)
-    curr.execute(insert_into_comments, row_to_insert)
+    row_to_insert = (key, videoid, author, display_name, comment, like_count, upload_date)
+
+    try:
+        curr.execute(insert_into_comments, row_to_insert)
+    except:
+        print("ERROR FAILED TO UPLOAD A COMMENT:")
+        print(row_to_insert)
+        input("Press any key to continue")
