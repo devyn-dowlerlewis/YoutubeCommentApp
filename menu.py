@@ -40,16 +40,6 @@ def scrape_videos_comments(API_KEY, CHANNEL_ID, pages):
         return df, culcomdf
 
 
-#         for video in df['video_id']:
-#             tempcomdf = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
-#             tempcomdf = Extract_Parent_Comments(API_KEY, video, tempcomdf, df)
-
-#             culcomdf = pd.concat([culcomdf, tempcomdf], axis=0)
-#             j = j + 1
-#             print("comments from video ", j)
-#         T3F = time.perf_counter()
-
-
 def eliminate_duplicates(df, comdf, keep):
     if keep:
         a = len(df)
