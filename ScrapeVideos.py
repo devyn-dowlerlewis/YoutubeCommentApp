@@ -3,95 +3,54 @@ import requests
 VIDEO_COUNT = 0
 
 def pull_uploads_info(API_KEY, CHANNEL_ID, df, pages):
+    vids_done = 0
+    pageToken = ""
     # Build URL and make api call to gather channel information
     channel_url = "https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=" + CHANNEL_ID + "&key=" + API_KEY
     response1 = requests.get(channel_url).json()
-    vids_done = 0
 
     # Extract uploads playlist id from API return and build new URL
     try:
         PLAYLIST_ID = response1['items'][0]['contentDetails']['relatedPlaylists']['uploads']
-    except:
-        print(response1)
-    uploads_url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=" + PLAYLIST_ID + "&key=" + API_KEY
-    response2 = requests.get(uploads_url).json()
+    except Exception as ex:
+        print(f"Issue with API request: {ex}")
+        return df
 
     if (pages < 1):
         pages = 1
 
-    # Collect video information from first page (50 videos) and append to dataframe
-    try:
-        pageToken = response2['nextPageToken']
-    except:
-        #print("error no next page token")
-        pageToken = ""
+    for i in range(pages):
+        uploads_url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=" + PLAYLIST_ID + "&key=" + API_KEY + "&pageToken=" + pageToken
+        paged_response = requests.get(uploads_url).json()
+        if i == 0:
+            print(f"Selected Channel: {paged_response['items'][0]['snippet']['channelTitle']}")
 
-    print(f"Selected Channel: {response2['items'][0]['snippet']['channelTitle']}")
-    for video in response2['items']:
-        if video['kind'] == "youtube#playlistItem":
-            vids_done += 1
-            if vids_done % 10 == 0:
-                print(f"Recorded information from {vids_done} videos")
-            video_id = video['snippet']['resourceId']['videoId']
-            video_title = video['snippet']['title']
-            video_title = str(video_title).replace("&#39;", "'")
-            video_title = str(video_title).replace("&quot;", "'")
-            channel_title = video['snippet']['channelTitle']
-            upload_date = video['snippet']['publishedAt']
-            # format date
-            upload_date = str(upload_date).replace("T", " ")
-            upload_date = str(upload_date).replace("Z", " UTC")
+        for video in paged_response['items']:
+            if video['kind'] == "youtube#playlistItem":
+                vids_done += 1
 
-            # Additional API call needed to get video stats
-            view_count, like_count, comment_count = get_video_details(video_id, API_KEY)
+                video_id = video['snippet']['resourceId']['videoId']
+                video_title = video['snippet']['title']
+                video_title = str(video_title).replace("&#39;", "'")
+                video_title = str(video_title).replace("&quot;", "'")
+                upload_date = video['snippet']['publishedAt']
+                upload_date = str(upload_date).replace("T", " ")
+                upload_date = str(upload_date).replace("Z", " UTC")
+                channel_title = video['snippet']['channelTitle']
 
-            df = df.append({'video_id': video_id, 'video_title': video_title, 'channel_title': channel_title,
-                            'upload_date': upload_date,
-                            'view_count': view_count, 'like_count': like_count,
-                            'comment_count': comment_count}, ignore_index=True)
+                view_count, like_count, comment_count = get_video_details(video_id, API_KEY)
 
-    # Add next page token to url and get next page of videos, loop to get desired number of pages
-    if pageToken == "":
-        pass
-    else:
-        for i in range(pages - 1):
-            uploads_url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=" + PLAYLIST_ID + "&key=" + API_KEY + "&pageToken=" + pageToken
-
-            paged_response = requests.get(uploads_url).json()
-            # print(paged_response)
-
-            # Exception may be thrown if a channel runs out of videos or API key reaches maximum allowed queries.
-            try:
-                for video in paged_response['items']:
-                    if video['kind'] == "youtube#playlistItem":
-                        vids_done += 1
-                        if vids_done % 10 == 0:
-                            print(f"Recorded information from {vids_done} videos")
-                        video_id = video['snippet']['resourceId']['videoId']
-                        video_title = video['snippet']['title']
-                        video_title = str(video_title).replace("&#39;", "'")
-                        video_title = str(video_title).replace("&quot;", "'")
-                        upload_date = video['snippet']['publishedAt']
-                        upload_date = str(upload_date).replace("T", " ")
-                        upload_date = str(upload_date).replace("Z", " UTC")
-
-                        view_count, like_count, comment_count = get_video_details(video_id, API_KEY)
-
-                        df = df.append({'video_id': video_id, 'video_title': video_title, 'channel_title': channel_title,
-                                        'upload_date': upload_date,
-                                        'view_count': view_count, 'like_count': like_count,
-                                        'comment_count': comment_count}, ignore_index=True)
-                print(i)
-
-            except Exception as ex:
-                print(ex)
-                print(i)
-
-            try:
-                pageToken = paged_response['nextPageToken']
-            except Exception as ex:
-                print(ex)
-                break
+                df = df.append({'video_id': video_id, 'video_title': video_title, 'channel_title': channel_title,
+                                'upload_date': upload_date,
+                                'view_count': view_count, 'like_count': like_count,
+                                'comment_count': comment_count}, ignore_index=True)
+                if vids_done % 10 == 0:
+                    print(f"Recorded information from {vids_done} videos")
+        try:
+            pageToken = paged_response['nextPageToken']
+        except:
+            print("Channel Out of Videos")
+            return df
 
     return df
 
@@ -113,17 +72,16 @@ def get_video_details(video_id, API_KEY):
     return view_count, like_count, comment_count
 
 
-def Extract_Parent_Comments(API_KEY, videoid, comdf, pages=421):
+def Extract_Parent_Comments(API_KEY, videoid, comdf, pages=421, keep_updated=False):
     pageToken = ""
+    count = 0
     # global total_api_time
     # Loop through pages of comments and collect information
     for i in range(pages):
-        #print(f"Collecting page {i + 1} of comments from video {videoid}")
+
         # Function to call api and return response containing 1 page of comments
-        # b = time.perf_counter()
         out = getCommentPage(API_KEY, videoid, pageToken)
-        # c = time.perf_counter()
-        # total_api_time += c-b
+
 
         # Extract comment text and information
         # Break if API call returns any issues
@@ -152,6 +110,8 @@ def Extract_Parent_Comments(API_KEY, videoid, comdf, pages=421):
         except Exception as e:
             #print(e)
             break
+        if keep_updated:
+            print(f"Collected page {(i + 1)} of comments.")
         # print(f"get comment page took {c-b} seconds to run. This consitutes {((c-b)/(d-b))*100}% of the total loop time")
 
     global VIDEO_COUNT

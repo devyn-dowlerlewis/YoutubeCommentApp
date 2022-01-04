@@ -6,7 +6,8 @@ def connect_to_db(host_name, dbname, username, password, port):
     try:
         conn = ps.connect(host=host_name, database=dbname, user=username, password=password, port=port)
     except ps.OperationalError as e:
-        raise e
+        print(f"Could not connect to database. Error: {e}")
+        conn = None
     else:
         print('Connected!')
     return conn

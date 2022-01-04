@@ -4,8 +4,11 @@ from itertools import repeat
 
 import ScrapeVideos
 import DatabaseFunctions
+import requests
 
 THREADING_FLAG = True
+
+key = ""
 
 def scrape_videos_comments(API_KEY, CHANNEL_ID, pages):
     df = pd.DataFrame(columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count",
@@ -91,17 +94,26 @@ def upload_videos_comments(df, comdf):
 
 
     conn = DatabaseFunctions.connect_to_db(host_name, dbname, username, password, port)
+    if conn is None:
+        return df, comdf
+
     curr = conn.cursor()
 
-    df, comdf = eliminate_duplicates(df, comdf, keep=True)
 
-    DatabaseFunctions.create_table(curr)
-    new_vid_df = DatabaseFunctions.update_db(curr, df)
-    DatabaseFunctions.append_from_df_to_db(curr, new_vid_df)
 
-    DatabaseFunctions.create_comment_table(curr)
-    new_comment_df = DatabaseFunctions.update_comment_db(curr, comdf)
-    DatabaseFunctions.append_from_comdf_to_db(curr, new_comment_df)
+    try:
+        df, comdf = eliminate_duplicates(df, comdf, keep=True)
+        DatabaseFunctions.create_table(curr)
+        new_vid_df = DatabaseFunctions.update_db(curr, df)
+        DatabaseFunctions.append_from_df_to_db(curr, new_vid_df)
+
+        DatabaseFunctions.create_comment_table(curr)
+        new_comment_df = DatabaseFunctions.update_comment_db(curr, comdf)
+        DatabaseFunctions.append_from_comdf_to_db(curr, new_comment_df)
+    except:
+
+        print("No write privileges")
+        return df, comdf
 
     conn.commit()
     print(f"Successfully Uploaded {len(df)} Videos")
@@ -252,19 +264,38 @@ def scrape_one(cul_df, cul_comdf, API_KEY):
     pages = int(pages)
     VIDEO_ID = input("Enter a video id (null entry defaults to... just enter one.): ") or "dQw4w9WgXcQ"
     print("working...")
-
+    df = scrape_single_video_info(VIDEO_ID, API_KEY)
     comdf = scrape_comments(API_KEY, VIDEO_ID, pages)
 
-    #cul_df = pd.concat([cul_df, df], axis=0)
+    cul_df = pd.concat([cul_df, df], axis=0)
     cul_comdf = pd.concat([cul_comdf, comdf], axis=0)
     print(f"Scraped {len(comdf)} comments.")
+    ScrapeVideos.reset_video_count()
 
     return cul_df, cul_comdf
 
 
 def scrape_comments(API_KEY, VIDEO_ID, pages):
     comdf = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
-    comdf = ScrapeVideos.Extract_Parent_Comments(API_KEY, VIDEO_ID, comdf, pages)
+    comdf = ScrapeVideos.Extract_Parent_Comments(API_KEY, VIDEO_ID, comdf, pages, keep_updated=True)
     return comdf
 
+def scrape_single_video_info(VIDEO_ID, API_KEY):
+    df = pd.DataFrame(columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count", "comment_count"])
+
+    url = f'https://www.googleapis.com/youtube/v3/videos?part=snippet&id={VIDEO_ID}&key={API_KEY}'
+    response1 = requests.get(url).json()
+
+    video_id = VIDEO_ID
+    video_title = response1['items'][0]['snippet']['title']
+    upload_date = response1['items'][0]['snippet']['publishedAt']
+    channel_title = response1['items'][0]['snippet']['channelTitle']
+
+    view_count, like_count, comment_count = ScrapeVideos.get_video_details(video_id, API_KEY)
+    df = df.append({'video_id': video_id, 'video_title': video_title, 'channel_title': channel_title,
+                    'upload_date': upload_date,
+                    'view_count': view_count, 'like_count': like_count,
+                    'comment_count': comment_count}, ignore_index=True)
+
+    return df
 

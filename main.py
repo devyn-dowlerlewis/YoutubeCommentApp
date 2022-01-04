@@ -4,16 +4,20 @@ import menu
 
 cul_df, cul_comdf = menu.reset_memory()
 
+API_KEY = ""
+
 while (user_input := input(menu.generate_prompt(len(cul_df), len(cul_comdf)))) != "0":
     if user_input == "1":
         os.system('cls')
-        API_KEY = input("Please Enter Your Youtube API Key: ")
+        if API_KEY == "":
+            API_KEY = input("Please Enter Your Youtube API Key: ")
         cul_df, cul_comdf = menu.scrape(cul_df, cul_comdf, API_KEY)
         input("Press any key to continue")
 
     elif user_input == "2":
         os.system('cls')
-        API_KEY = input("Please Enter Your Youtube API Key: ")
+        if API_KEY == "":
+            API_KEY = input("Please Enter Your Youtube API Key: ")
         cul_df, cul_comdf = menu.scrape_one(cul_df, cul_comdf, API_KEY)
         input("Press any key to continue")
 
@@ -53,6 +57,7 @@ while (user_input := input(menu.generate_prompt(len(cul_df), len(cul_comdf)))) !
         input("Press any key to continue")
 
     else:
+        os.system('cls')
         input(f"{user_input} IS DECIDEDLY NOT AN OPTION")
 
     os.system('cls')
