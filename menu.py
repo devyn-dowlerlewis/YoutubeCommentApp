@@ -8,7 +8,7 @@ import requests
 
 THREADING_FLAG = True
 
-key = ""
+#key = ""
 
 def scrape_videos_comments(API_KEY, CHANNEL_ID, pages):
     df = pd.DataFrame(columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count",
@@ -53,7 +53,7 @@ def scrape_videos_comments(API_KEY, CHANNEL_ID, pages):
 #         T3F = time.perf_counter()
 
 
-def eliminate_duplicates(df, comdf, keep):
+def eliminate_duplicates(df, comdf, keep, silent=False):
     if keep:
         a = len(df)
         b = len(comdf)
@@ -63,8 +63,11 @@ def eliminate_duplicates(df, comdf, keep):
 
         c = len(newdf)
         d = len(newcomdf)
-        print(f"{a - c} DUPLICATE VIDEOS ELIMINATED")
-        print(f"{b - d} DUPLICATE COMMENTS ELIMINATED")
+        if silent:
+            pass
+        else:
+            print(f"{a - c} DUPLICATE VIDEOS ELIMINATED")
+            print(f"{b - d} DUPLICATE COMMENTS ELIMINATED")
     else:
         newdf = df.drop_duplicates(subset=['video_id'], keep=False)
         newcomdf = comdf.drop_duplicates(subset=['key'], keep=False)
@@ -102,22 +105,27 @@ def upload_videos_comments(df, comdf):
 
 
     try:
-        df, comdf = eliminate_duplicates(df, comdf, keep=True)
+        df, comdf = eliminate_duplicates(df, comdf, keep=True, silent=True)
         DatabaseFunctions.create_table(curr)
         new_vid_df = DatabaseFunctions.update_db(curr, df)
         DatabaseFunctions.append_from_df_to_db(curr, new_vid_df)
+        print(f"Successfully Uploaded {len(df)} Videos")
 
         DatabaseFunctions.create_comment_table(curr)
-        new_comment_df = DatabaseFunctions.update_comment_db(curr, comdf)
-        DatabaseFunctions.append_from_comdf_to_db(curr, new_comment_df)
-    except:
-
+        new_comment_df, existing_comdf = DatabaseFunctions.sort_comment_db(conn, comdf)
+        #new_comment_df = DatabaseFunctions.update_comment_db(curr, existing_comdf)
+        DatabaseFunctions.append_new_comments(curr, new_comment_df)
+        #DatabaseFunctions.append_from_comdf_to_db(curr, new_comment_df)
+        print(f"Successfully Uploaded {len(new_comment_df)} Comments")
+    except Exception as e:
+        print(e)
         print("No write privileges")
         return df, comdf
 
     conn.commit()
-    print(f"Successfully Uploaded {len(df)} Videos")
-    print(f"Successfully Uploaded {len(comdf)} Comments")
+    print("Changes successfully committed to database.")
+
+
 
     if input('Wipe Memory? (y/(n)') == "y":
         df, comdf = reset_memory()
@@ -161,7 +169,7 @@ def generate_prompt(df_length, com_length):
 WELCOME TO MY MEDIOCRE YOUTUBE SCRAPER
 bugs guaranteed...
 ___________________________________________________________________
-CURRENTLY IN MEMORY: {df_length} Videos, {com_length} Comments
+CURRENTLY IN MEMORY: {"{:,}".format(df_length)} Videos  |  {"{:,}".format(com_length)} Comments
 ___________________________________________________________________
 PRESS 1 TO SCRAPE VIDEOS AND COMMENTS FROM A TARGET CHANNEL
 
@@ -223,7 +231,7 @@ def reset_memory():
 
     return cul_df, cul_comdf
 
-def eliminate_dbclones(cul_df, cul_comdf):
+def eliminate_dbclones(cul_df, cul_comdf, silent=False):
     conn = None
     default_prompt = "Use Default Database? ([y]/n)"
     if input(default_prompt) == "n":
@@ -250,12 +258,15 @@ def eliminate_dbclones(cul_df, cul_comdf):
     new_df = cul_df[~cul_df.video_id.isin(key_df)]
     new_comdf = cul_comdf[~cul_comdf.key.isin(key_comdf)]
 
-    a = len(cul_df)
-    c = len(new_df)
-    b = len(cul_comdf)
-    d = len(new_comdf)
-    print(f"{a - c} EXISTING VIDEOS ELIMINATED")
-    print(f"{b - d} EXISTING COMMENTS ELIMINATED")
+    if silent:
+        pass
+    else:
+        a = len(cul_df)
+        c = len(new_df)
+        b = len(cul_comdf)
+        d = len(new_comdf)
+        print(f"{a - c} EXISTING VIDEOS ELIMINATED")
+        print(f"{b - d} EXISTING COMMENTS ELIMINATED")
 
     return new_df, new_comdf
 

@@ -1,5 +1,7 @@
 import pandas as pd
 import psycopg2 as ps
+from psycopg2.extras import execute_values
+import time
 
 # Connect to the Database
 def connect_to_db(host_name, dbname, username, password, port):
@@ -93,6 +95,18 @@ def create_comment_table(curr):
     curr.execute(create_table_command)
 
 
+def sort_comment_db(conn, comdf):
+    key_comdf = pd.read_sql_query('select key from "comments"', conn)
+    key_comdf = key_comdf['key'].tolist()
+    new_comdf = comdf[~comdf.key.isin(key_comdf)]
+    old_comdf = comdf[comdf.key.isin(key_comdf)]
+    #print(f"Sorted comments into {len(new_comdf)} New comments and {len(old_comdf)} previously existing comments.")
+    print(f"Removed {len(old_comdf)} previously existing comments.")
+    new_comdf = new_comdf.reset_index(drop=True)
+    old_comdf = old_comdf.reset_index(drop=True)
+    return new_comdf, old_comdf
+
+
 def update_comment_db(curr, comdf):
     temp_df = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
     up_count = 0
@@ -130,14 +144,27 @@ def check_if_comment_exists(curr, key):
     return curr.fetchone() is not None
 
 
+def append_new_comments(curr, comdf):
+    print(f"Uploading comments. Estimated time to upload {len(comdf)} comments: {round(len(comdf) / 1600, 5)} seconds")
+    start = time.perf_counter()
+    records = comdf.to_records(index=False)
+    comdf_tuple = list(records)
+    execute_values(curr, "INSERT INTO comments (key, videoid, author, display_name, comment, like_count, upload_date) VALUES %s", comdf_tuple)
+    end = time.perf_counter()
+    print(f"Finished in {round(end - start, 6)} seconds. This corresponds to {(round(end - start, 6) / len(comdf)) * 1000} ms per comment.")
+
+
 def append_from_comdf_to_db(curr, comdf):
     i = 0
+    start = time.perf_counter()
+    print(f"Uploading {len(comdf)} new comments to the database")
     for i, row in comdf.iterrows():
         insert_comment_into_table(curr, row['key'], row['videoid'], row['author'], row['display_name'], row['comment'],
                                   row['like_count'], row['upload_date'])
         if ((i + 1) % 500 == 0):
             print('New Comments Inserted: ', i + 1)
-
+    end = time.perf_counter()
+    print(f"Finished in {round(end - start, 6)} seconds. This corresponds to {(round(end - start, 6) / len(comdf)) * 1000} ms per comment.")
 
 def insert_comment_into_table(curr, key, videoid, author, display_name, comment, like_count, upload_date):
     insert_into_comments = ("""INSERT INTO comments (key, videoid, author, display_name, comment, like_count, upload_date)
