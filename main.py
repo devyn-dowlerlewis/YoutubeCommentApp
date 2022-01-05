@@ -2,7 +2,7 @@ import os
 
 import menu
 
-cul_df, cul_comdf = menu.reset_memory()
+cul_df, cul_comdf = menu.reset_memory(silent=True)
 
 API_KEY = ""
 

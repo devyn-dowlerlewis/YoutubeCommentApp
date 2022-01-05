@@ -165,8 +165,7 @@ def toggle_threading():
     print(f"THREADING = {THREADING_FLAG}")
 
 def generate_prompt(df_length, com_length):
-    prompt = f"""
-WELCOME TO MY MEDIOCRE YOUTUBE SCRAPER
+    prompt = f"""WELCOME TO MY MEDIOCRE YOUTUBE SCRAPER
 bugs guaranteed...
 ___________________________________________________________________
 CURRENTLY IN MEMORY: {"{:,}".format(df_length)} Videos  |  {"{:,}".format(com_length)} Comments
@@ -221,14 +220,16 @@ def download_to_memory(cul_df, cul_comdf):
     cul_comdf = pd.concat([cul_comdf, comdf], axis=0)
     return cul_df, cul_comdf
 
-def reset_memory():
+def reset_memory(silent=False):
     cul_df = pd.DataFrame(
         columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count",
                  "comment_count"])
     cul_comdf = pd.DataFrame(
         columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
-    print("Memory Wiped")
-
+    if silent:
+        pass
+    else:
+        print("Memory Wiped")
     return cul_df, cul_comdf
 
 def eliminate_dbclones(cul_df, cul_comdf, silent=False):
