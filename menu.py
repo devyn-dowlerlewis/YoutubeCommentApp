@@ -165,6 +165,39 @@ ___________________________________________________________________
 
     return prompt
 
+
+def generate_analysis_prompt(df_length, com_length):
+    prompt = f"""WELCOME TO MY MEDIOCRE YOUTUBE SCRAPER
+bugs guaranteed...
+___________________________________________________________________
+CURRENTLY IN MEMORY: {"{:,}".format(df_length)} Videos  |  {"{:,}".format(com_length)} Comments
+___________________________________________________________________
+PRESS 1 TO SCRAPE VIDEOS AND COMMENTS FROM A TARGET CHANNEL
+
+PRESS 2 TO SCRAPE COMMENTS FROM A TARGET VIDEO
+
+PRESS 3 TO DOWNLOAD DATABASE COMMENTS AND VIDEOS TO MEMORY
+
+PRESS 4 TO PRINT CURRENT VIDEO AND COMMENT DATA
+
+PRESS 5 TO UPLOAD ALL VIDEO AND COMMENT INFORMATION TO A DATABASE (DEFAULT DATABASE REQUIRES ELEVATED PERMISSIONS)
+
+PRESS 6 TO ELIMINATE ALL DUPLICATE ENTRIES IN MEMORY
+
+PRESS 7 TO ELIMINATE ALL ENTRIES IN MEMORY ALREADY IN THE DATABASE
+
+PRESS 8 TO WIPE EVERYTHING FROM MEMORY
+
+PRESS 9 TO TOGGLE THREADING (CURRENTLY {THREADING_FLAG})
+___________________________________________________________________
+PRESS 0 TO EXIT
+___________________________________________________________________
+"""
+
+    return prompt
+
+
+
 def scrape(cul_df, cul_comdf, API_KEY):
     pages = input("How many pages of 50 videos?") or 1
     pages = int(pages)
