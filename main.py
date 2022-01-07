@@ -56,6 +56,10 @@ while (user_input := input(menu.generate_prompt(len(cul_df), len(cul_comdf)))) !
         menu.toggle_threading()
         input("Press any key to continue")
 
+    elif user_input == "10":
+        pass
+        # os.system('cls')
+        # while (user_input := input(menu.generate_analysis_prompt(len(cul_df), len(cul_comdf)))) != "0":
     else:
         os.system('cls')
         input(f"{user_input} IS DECIDEDLY NOT AN OPTION")

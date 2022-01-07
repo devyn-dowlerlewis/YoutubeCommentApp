@@ -88,6 +88,7 @@ def Extract_Parent_Comments(API_KEY, videoid, comdf, pages=421, keep_updated=Fal
         try:
             for comment in out['items']:
                 ytCom = comment['snippet']['topLevelComment']['snippet']['textDisplay']
+                ytCom = ytCom.replace('\x00', '')
                 comAuthor = comment['snippet']['topLevelComment']['snippet']['authorChannelId']['value']
                 comDisplayName = comment['snippet']['topLevelComment']['snippet']['authorDisplayName']
                 like_count = comment['snippet']['topLevelComment']['snippet']['likeCount']
