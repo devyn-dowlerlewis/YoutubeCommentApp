@@ -344,3 +344,22 @@ def scrape_single_video_info(VIDEO_ID, API_KEY):
 
     return df
 
+def grab_missing_comments(df, cul_comdf):
+    API_KEY = input("Please Enter Your Youtube API Key: ")
+    id_comdf = cul_comdf['videoid'].tolist()
+    new_df = df[~df.video_id.isin(id_comdf)]
+    print(f"{len(new_df)} videos have no associated comments.")
+
+    tempcomdf = pd.DataFrame(
+        columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
+
+    print("Attempting to collect comments with multithreading")
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = executor.map(ScrapeVideos.Extract_Parent_Comments, repeat(API_KEY), new_df['video_id'], repeat(tempcomdf))
+        for result in results:
+            cul_comdf = pd.concat([cul_comdf, result], axis=0)
+
+    ScrapeVideos.reset_video_count()
+    return df, cul_comdf
+

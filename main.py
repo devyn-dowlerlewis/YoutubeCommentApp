@@ -57,9 +57,9 @@ while (user_input := input(menu.generate_prompt(len(cul_df), len(cul_comdf)))) !
         input("Press any key to continue")
 
     elif user_input == "10":
-        pass
-        # os.system('cls')
-        # while (user_input := input(menu.generate_analysis_prompt(len(cul_df), len(cul_comdf)))) != "0":
+        os.system('cls')
+        cul_df, cul_comdf = menu.grab_missing_comments(cul_df, cul_comdf)
+        input("Press any key to continue")
     else:
         os.system('cls')
         input(f"{user_input} IS DECIDEDLY NOT AN OPTION")
