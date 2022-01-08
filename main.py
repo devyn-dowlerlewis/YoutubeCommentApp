@@ -23,8 +23,7 @@ while (user_input := input(menu.generate_prompt(len(cul_df), len(cul_comdf)))) !
 
     elif user_input == "3":
         os.system('cls')
-        cul_df, cul_comdf = menu.download_to_memory(cul_df, cul_comdf)
-        input("Press any key to continue")
+        cul_df, cul_comdf = menu.download_menu(cul_df, cul_comdf)
 
     elif user_input == "4":
         os.system('cls')

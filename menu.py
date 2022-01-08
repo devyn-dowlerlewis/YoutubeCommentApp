@@ -5,6 +5,8 @@ from itertools import repeat
 import ScrapeVideos
 import DatabaseFunctions
 import requests
+import os
+from tabulate import tabulate
 
 THREADING_FLAG = True
 
@@ -41,16 +43,6 @@ def scrape_videos_comments(API_KEY, CHANNEL_ID, pages):
 
         ScrapeVideos.reset_video_count()
         return df, culcomdf
-
-
-#         for video in df['video_id']:
-#             tempcomdf = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
-#             tempcomdf = Extract_Parent_Comments(API_KEY, video, tempcomdf, df)
-
-#             culcomdf = pd.concat([culcomdf, tempcomdf], axis=0)
-#             j = j + 1
-#             print("comments from video ", j)
-#         T3F = time.perf_counter()
 
 
 def eliminate_duplicates(df, comdf, keep, silent=False):
@@ -134,7 +126,37 @@ def upload_videos_comments(df, comdf):
     return df, comdf
 
 
-def download_videos_comments():
+def download_channel_videos_comments(target):
+    conn = None
+    host_name = 'database-ctvnews.casuycfmi5ss.us-east-2.rds.amazonaws.com'
+    dbname = 'russia'
+    port = '5432'
+    username = 'publictest'
+    password = '12345'
+
+    conn = DatabaseFunctions.connect_to_db(host_name, dbname, username, password, port)
+    curr = conn.cursor()
+
+    df = pd.DataFrame(columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count",
+                               "comment_count"])
+    comdf = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
+
+    sql_df = f'''SELECT videos.* FROM videos 
+LEFT JOIN comments ON videos.video_id = comments.videoid WHERE videos.channel_title = '{target}';'''
+
+    sql_comdf = f'''SELECT comments.* FROM videos 
+JOIN comments ON videos.video_id = comments.videoid WHERE videos.channel_title = '{target}';'''
+    comdf = pd.read_sql_query(sql_comdf, conn)
+
+    df = pd.read_sql_query(sql_df, conn)
+    df, comdf = eliminate_duplicates(df, comdf, keep=True, silent=True)
+    print(f"Downloaded information from {len(df)} videos")
+    print(f"Downloaded information from {len(comdf)} comments")
+    return df, comdf
+
+
+
+def download_all_videos_comments():
     conn = None
     host_name = 'database-ctvnews.casuycfmi5ss.us-east-2.rds.amazonaws.com'
     dbname = 'russia'
@@ -174,7 +196,7 @@ PRESS 1 TO SCRAPE VIDEOS AND COMMENTS FROM A TARGET CHANNEL
 
 PRESS 2 TO SCRAPE COMMENTS FROM A TARGET VIDEO
 
-PRESS 3 TO DOWNLOAD DATABASE COMMENTS AND VIDEOS TO MEMORY
+PRESS 3 TO DOWNLOAD INFORMATION FROM A DATABASE
 
 PRESS 4 TO PRINT CURRENT VIDEO AND COMMENT DATA
 
@@ -226,6 +248,47 @@ ___________________________________________________________________
     return prompt
 
 
+def generate_download_prompt(df_length, com_length):
+    prompt = f"""DOWNLOAD FROM DATABASE
+___________________________________________________________________
+CURRENTLY IN MEMORY: {"{:,}".format(df_length)} Videos  |  {"{:,}".format(com_length)} Comments
+___________________________________________________________________
+PRESS 1 TO VIEW DATABASE CONTENTS
+
+PRESS 2 TO DOWNLOAD FROM A SPECIFIED CHANNEL
+
+PRESS 3 TO DOWNLOAD ALL VIDEOS
+___________________________________________________________________
+PRESS 0 TO EXIT
+___________________________________________________________________
+"""
+
+    return prompt
+
+
+def download_menu(cul_df, cul_comdf):
+    while (user_input := input(generate_download_prompt(len(cul_df), len(cul_comdf)))) != "0":
+        if user_input == "1":
+            os.system('cls')
+            cul_df, cul_comdf = display_DB_contents(cul_df, cul_comdf)
+            input("Press any key to continue")
+        elif user_input == "2":
+            os.system('cls')
+            target = input('please enter channel name: ')
+            cul_df, cul_comdf = download_channel_to_memory(cul_df, cul_comdf, target)
+            input("Press any key to continue")
+        elif user_input == "3":
+            os.system('cls')
+            cul_df, cul_comdf = download_to_memory(cul_df, cul_comdf)
+            input("Press any key to continue")
+        else:
+            os.system('cls')
+            input(f"{user_input} IS DECIDEDLY NOT AN OPTION")
+
+        os.system('cls')
+    return cul_df, cul_comdf
+
+
 
 def scrape(cul_df, cul_comdf, API_KEY):
     pages = input("How many pages of 50 videos?") or 1
@@ -248,7 +311,13 @@ def print_data(cul_df, cul_comdf):
     print(cul_comdf)
 
 def download_to_memory(cul_df, cul_comdf):
-    df, comdf = download_videos_comments()
+    df, comdf = download_all_videos_comments()
+    cul_df = pd.concat([cul_df, df], axis=0)
+    cul_comdf = pd.concat([cul_comdf, comdf], axis=0)
+    return cul_df, cul_comdf
+
+def download_channel_to_memory(cul_df, cul_comdf, target):
+    df, comdf = download_channel_videos_comments(target)
     cul_df = pd.concat([cul_df, df], axis=0)
     cul_comdf = pd.concat([cul_comdf, comdf], axis=0)
     return cul_df, cul_comdf
@@ -362,4 +431,44 @@ def grab_missing_comments(df, cul_comdf):
 
     ScrapeVideos.reset_video_count()
     return df, cul_comdf
+
+def display_DB_contents(cul_df, cul_comdf):
+    video_count_sql = '''SELECT channel_title, COUNT(*) FROM videos GROUP BY channel_title order by channel_title;'''
+
+    comment_count_sql = '''SELECT videos.channel_title, COUNT(*) FROM comments 
+JOIN videos ON comments.videoid = videos.video_id GROUP BY channel_title order by channel_title;'''
+
+    conn = None
+    host_name = 'database-ctvnews.casuycfmi5ss.us-east-2.rds.amazonaws.com'
+    dbname = 'russia'
+    port = '5432'
+    username = 'publictest'
+    password = '12345'
+
+    conn = DatabaseFunctions.connect_to_db(host_name, dbname, username, password, port)
+    curr = conn.cursor()
+
+    count_df = pd.read_sql_query(video_count_sql, conn)
+    count_comdf = pd.read_sql_query(comment_count_sql, conn)
+    count_df['countcoms'] = count_comdf['count']
+    df = count_df.sort_values(by=['countcoms'], ascending=False, ignore_index=True)
+
+
+
+    prompt = f'''___________________________________________________________________
+CURRENTLY IN MEMORY: {"{:,}".format(len(cul_df))} Videos  |  {"{:,}".format(len(cul_comdf))} Comments
+___________________________________________________________________
+'''
+    print(prompt)
+    print(tabulate(df, headers=["CHANNEL NAME","VIDEO COUNT", "COMMENT COUNT"], tablefmt='psql', showindex=False))
+    target = input("Please Specify a Channel To Download Videos From (0 to Exit): ")
+    if target == 0:
+        return cul_df, cul_comdf
+    else:
+        cul_df, cul_comdf = download_channel_to_memory(cul_df, cul_comdf, target)
+        return cul_df, cul_comdf
+
+
+
+
 

@@ -5,6 +5,7 @@ import time
 
 # Connect to the Database
 def connect_to_db(host_name, dbname, username, password, port):
+    #dbname = 'test'
     try:
         conn = ps.connect(host=host_name, database=dbname, user=username, password=password, port=port)
     except ps.OperationalError as e:

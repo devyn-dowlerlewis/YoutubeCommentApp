@@ -61,8 +61,13 @@ def get_video_details(video_id, API_KEY):
     reponse_video_stats = requests.get(url_video_stats).json()
     # print(reponse_video_stats)
     # Extract video information
-    view_count = reponse_video_stats['items'][0]['statistics']['viewCount']
-    like_count = reponse_video_stats['items'][0]['statistics']['likeCount']
+    try:
+        view_count = reponse_video_stats['items'][0]['statistics']['viewCount']
+        like_count = reponse_video_stats['items'][0]['statistics']['likeCount']
+    except:
+        print('error')
+        print(reponse_video_stats)
+
     # Check if comments are disabled
     try:
         comment_count = reponse_video_stats['items'][0]['statistics']['commentCount']
