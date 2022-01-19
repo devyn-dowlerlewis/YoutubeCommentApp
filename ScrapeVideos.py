@@ -1,6 +1,53 @@
 import requests
+import pandas as pd
+import concurrent.futures
+from itertools import repeat
 
 VIDEO_COUNT = 0
+
+def scrape_single_video_info(VIDEO_ID, API_KEY):
+    df = pd.DataFrame(columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count", "comment_count"])
+
+    url = f'https://www.googleapis.com/youtube/v3/videos?part=snippet&id={VIDEO_ID}&key={API_KEY}'
+    response1 = requests.get(url).json()
+
+    video_id = VIDEO_ID
+    video_title = response1['items'][0]['snippet']['title']
+    upload_date = response1['items'][0]['snippet']['publishedAt']
+    channel_title = response1['items'][0]['snippet']['channelTitle']
+
+    view_count, like_count, comment_count = get_video_details(video_id, API_KEY)
+    df = df.append({'video_id': video_id, 'video_title': video_title, 'channel_title': channel_title,
+                    'upload_date': upload_date,
+                    'view_count': view_count, 'like_count': like_count,
+                    'comment_count': comment_count}, ignore_index=True)
+    reset_video_count()
+    return df
+
+def scrape_videos_comments(API_KEY, CHANNEL_ID, pages):
+    df = pd.DataFrame(columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count",
+                               "comment_count"])
+
+    comdf = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
+
+    df = pull_uploads_info(API_KEY, CHANNEL_ID, df, pages)
+    j = 0
+
+
+    culcomdf = pd.DataFrame(
+        columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
+    tempcomdf = pd.DataFrame(
+        columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
+
+    print("Attempting to collect comments with multithreading")
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = executor.map(Extract_Parent_Comments, repeat(API_KEY), df['video_id'], repeat(tempcomdf))
+        for result in results:
+            culcomdf = pd.concat([culcomdf, result], axis=0)
+
+    reset_video_count()
+    return df, culcomdf
 
 def pull_uploads_info(API_KEY, CHANNEL_ID, df, pages):
     vids_done = 0
@@ -61,13 +108,21 @@ def get_video_details(video_id, API_KEY):
     reponse_video_stats = requests.get(url_video_stats).json()
     # print(reponse_video_stats)
     # Extract video information
+
+    # Pretty sure all videos have public view counts but just in case...
     try:
         view_count = reponse_video_stats['items'][0]['statistics']['viewCount']
+    except:
+        print('error no view information')
+        print(reponse_video_stats)
+        view_count = 0
+    # Check if rating disabled
+    try:
         like_count = reponse_video_stats['items'][0]['statistics']['likeCount']
     except:
-        print('error')
+        print('error no like_count information')
         print(reponse_video_stats)
-
+        like_count = 0
     # Check if comments are disabled
     try:
         comment_count = reponse_video_stats['items'][0]['statistics']['commentCount']

@@ -6,7 +6,7 @@ cul_df, cul_comdf = menu.reset_memory(silent=True)
 
 API_KEY = ""
 
-while (user_input := input(menu.generate_prompt(len(cul_df), len(cul_comdf)))) != "0":
+while (user_input := input(menu.generate_main_prompt(len(cul_df), len(cul_comdf)))) != "0":
     if user_input == "1":
         os.system('cls')
         if API_KEY == "":
@@ -52,12 +52,12 @@ while (user_input := input(menu.generate_prompt(len(cul_df), len(cul_comdf)))) !
 
     elif user_input == "9":
         os.system('cls')
-        menu.toggle_threading()
+        pass
         input("Press any key to continue")
 
     elif user_input == "10":
         os.system('cls')
-        cul_df, cul_comdf = menu.grab_missing_comments(cul_df, cul_comdf)
+        pass
         input("Press any key to continue")
     else:
         os.system('cls')

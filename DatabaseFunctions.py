@@ -2,18 +2,42 @@ import pandas as pd
 import psycopg2 as ps
 from psycopg2.extras import execute_values
 import time
+import menu
+from tabulate import tabulate
 
 # Connect to the Database
-def connect_to_db(host_name, dbname, username, password, port):
-    #dbname = 'test'
+def connect_to_db(type = 'default'):
+    conn = None
+    if type == 'custom':
+        host_name = input("Enter Hostname: ")
+        dbname = input("Enter Database Name: ")
+        port = input("Enter Port: ")
+        username = input("Enter Username: ")
+        password = input("Enter Password: ")
+    elif type == 'elevated':
+        host_name = 'database-ctvnews.casuycfmi5ss.us-east-2.rds.amazonaws.com'
+        dbname = 'russia'
+        port = '5432'
+        print("EXTENDED PERMISSIONS REQUIRED")
+        username = input("Enter Username: ")
+        password = input("Enter Password: ")
+    else:
+        host_name = 'database-ctvnews.casuycfmi5ss.us-east-2.rds.amazonaws.com'
+        dbname = 'russia'
+        port = '5432'
+        username = 'publictest'
+        password = '12345'
+
     try:
         conn = ps.connect(host=host_name, database=dbname, user=username, password=password, port=port)
+        curr = conn.cursor()
     except ps.OperationalError as e:
         print(f"Could not connect to database. Error: {e}")
         conn = None
+        curr = None
     else:
         print('Connected!')
-    return conn
+    return conn, curr
 
 
 # Create the video table in the database
@@ -179,3 +203,81 @@ def insert_comment_into_table(curr, key, videoid, author, display_name, comment,
         print("ERROR FAILED TO UPLOAD A COMMENT:")
         print(row_to_insert)
         input("Press any key to continue")
+
+#Download_Menu_________________________________________________________________
+
+def download_channel_videos_comments(target):
+    conn, curr = connect_to_db()
+
+    df = pd.DataFrame(columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count",
+                               "comment_count"])
+    comdf = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
+
+    sql_df = f'''SELECT videos.* FROM videos 
+LEFT JOIN comments ON videos.video_id = comments.videoid WHERE videos.channel_title = '{target}';'''
+
+    sql_comdf = f'''SELECT comments.* FROM videos 
+JOIN comments ON videos.video_id = comments.videoid WHERE videos.channel_title = '{target}';'''
+    comdf = pd.read_sql_query(sql_comdf, conn)
+
+    df = pd.read_sql_query(sql_df, conn)
+    df, comdf = menu.eliminate_duplicates(df, comdf, keep=True, silent=True)
+    print(f"Downloaded information from {len(df)} videos")
+    print(f"Downloaded information from {len(comdf)} comments")
+    return df, comdf
+
+
+def download_all_videos_comments():
+    conn, curr = connect_to_db()
+
+    df = pd.DataFrame(columns=["video_id", "video_title", "channel_title", "upload_date", "view_count", "like_count",
+                               "comment_count"])
+    comdf = pd.DataFrame(columns=['key', 'videoid', 'author', 'display_name', 'comment', 'like_count', 'upload_date'])
+
+    df = pd.read_sql_query('select * from "videos"', conn)
+    print(f"Downloaded information from {len(df)} videos")
+    comdf = pd.read_sql_query('select * from "comments"', conn)
+    print(f"Downloaded information from {len(comdf)} comments")
+
+    return df, comdf
+
+def display_contents(prompt):
+    video_count_sql = '''SELECT channel_title, COUNT(*) FROM videos GROUP BY channel_title order by channel_title;'''
+    comment_count_sql = '''SELECT videos.channel_title, COUNT(*) FROM comments 
+    JOIN videos ON comments.videoid = videos.video_id GROUP BY channel_title order by channel_title;'''
+
+    conn, curr = connect_to_db()
+
+    count_df = pd.read_sql_query(video_count_sql, conn)
+    count_comdf = pd.read_sql_query(comment_count_sql, conn)
+    count_df['countcoms'] = count_comdf['count']
+    df = count_df.sort_values(by=['countcoms'], ascending=False, ignore_index=True)
+
+    print(prompt)
+    print(tabulate(df, headers=["CHANNEL NAME", "VIDEO COUNT", "COMMENT COUNT"], tablefmt='psql', showindex=False))
+
+#Upload_________________________________________________________________________________________________________________________
+
+def upload_db_info(df, comdf, curr, conn):
+    if conn is None:
+        return df, comdf
+
+    try:
+        df, comdf = menu.eliminate_duplicates(df, comdf, keep=True, silent=True)
+        create_table(curr)
+        new_vid_df = update_db(curr, df)
+        append_from_df_to_db(curr, new_vid_df)
+        print(f"Successfully Uploaded {len(df)} Videos")
+
+        create_comment_table(curr)
+        new_comment_df, _ = sort_comment_db(conn, comdf)
+        append_new_comments(curr, new_comment_df)
+        print(f"Successfully Uploaded {len(new_comment_df)} Comments")
+    except Exception as e:
+        print(e)
+        print("No write privileges")
+        return df, comdf
+
+    conn.commit()
+    print("Changes successfully committed to database.")
+    return df, comdf
