@@ -32,6 +32,8 @@ PRESS 6 TO ELIMINATE ALL DUPLICATE ENTRIES IN MEMORY
 PRESS 7 TO ELIMINATE ALL ENTRIES IN MEMORY ALREADY IN THE DATABASE
 
 PRESS 8 TO WIPE EVERYTHING FROM MEMORY
+
+PRESS 9 TO OPEN ANALYSIS MENU (UNDER DEVELOPMENT)
 ___________________________________________________________________
 PRESS 0 TO EXIT
 ___________________________________________________________________
@@ -116,6 +118,7 @@ def download_menu(cul_df, cul_comdf):
         if user_input == "1":
             os.system('cls')
             cul_df, cul_comdf = display_DB_contents(cul_df, cul_comdf)
+            input("Press any key to continue")
         elif user_input == "2":
             os.system('cls')
             target = input('please enter channel name: ')
@@ -184,7 +187,7 @@ def upload_videos_comments(df, comdf):
         pass
     return df, comdf
 
-#____________________________________________________________________________________________________________________________________________
+#ELIM DUPES____________________________________________________________________________________________________________________________________________
 def eliminate_duplicates(df, comdf, keep, silent=False):
     if keep:
         a = len(df)
@@ -212,14 +215,16 @@ def eliminate_duplicates(df, comdf, keep, silent=False):
 #Analysis_Menu_____________________________________________________________________________________________________
 
 
-def generate_analysis_prompt(df_length, com_length):
+def generate_analysis_prompt(df_length, com_length, com_anal_length):
     prompt = f"""DATA ANALYSIS
 ___________________________________________________________________
-CURRENTLY IN MEMORY: {"{:,}".format(df_length)} Videos  |  {"{:,}".format(com_length)} Comments
+CURRENTLY IN MEMORY: {"{:,}".format(df_length)} Videos  |  {"{:,}".format(com_length)} Comments ({"{:,}".format(com_anal_length)} With Sentiment Information)
 ___________________________________________________________________
 PRESS 1 TO ANALYSE COMMENT SENTIMENT
+
+PRESS 2 TO UPLOAD SENTIMENT INFORMATION
 ___________________________________________________________________
-PRESS 0 TO EXIT
+PRESS 0 TO EXIT (WIPES SENTIMENT INFO)
 ___________________________________________________________________
 """
 
@@ -228,19 +233,33 @@ ___________________________________________________________________
 
 def analysis_menu(cul_df, cul_comdf):
     df_anal = pd.DataFrame(columns=["video_id", "avg_sentiment"])
-    comdf_anal = pd.DataFrame(columns=["key", "flair_sentiment_slow", "flair_sentiment_fast"])
+    comdf_anal = pd.DataFrame(columns=["key", "flair_sentiment_slow", "flair_sentiment_fast", "rating"])
 
-    while (user_input := input(generate_analysis_prompt(len(cul_df), len(cul_comdf)))) != "0":
+    while (user_input := input(generate_analysis_prompt(len(cul_df), len(cul_comdf), len(comdf_anal)))) != "0":
         if user_input == "1":
             os.system('cls')
             cul_df, cul_comdf, df_anal, comdf_anal = Analysis.analyse_sentiment(cul_df, cul_comdf, df_anal, comdf_anal)
-            print(comdf_anal)
+            input("Press any key to continue")
+        elif user_input == "2":
+            os.system('cls')
+            df_anal, comdf_anal = upload_sentiment(df_anal, comdf_anal)
             input("Press any key to continue")
         else:
             os.system('cls')
             input(f"{user_input} IS DECIDEDLY NOT AN OPTION")
         os.system('cls')
     return cul_df, cul_comdf
+
+
+def upload_sentiment(df_anal, comdf_anal):
+    default_prompt = "Use Default Database? ([y]/n) "
+    if input(default_prompt) == "n":
+        conn, curr = DatabaseFunctions.connect_to_db(type='custom')
+    else:
+        conn, curr = DatabaseFunctions.connect_to_db(type='elevated')
+
+    df_anal, comdf_anal = DatabaseFunctions.upload_sentiment_info(df_anal, comdf_anal, conn, curr)
+    return df_anal, comdf_anal
 
 #Wipe Memory_____________________________________________________________________________________________________________________
 

@@ -52,8 +52,7 @@ while (user_input := input(menu.generate_main_prompt(len(cul_df), len(cul_comdf)
 
     elif user_input == "9":
         os.system('cls')
-        pass
-        input("Press any key to continue")
+        cul_df, cul_comdf = menu.analysis_menu(cul_df, cul_comdf)
 
     elif user_input == "10":
         os.system('cls')

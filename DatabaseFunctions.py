@@ -281,3 +281,49 @@ def upload_db_info(df, comdf, curr, conn):
     conn.commit()
     print("Changes successfully committed to database.")
     return df, comdf
+
+#Analysis__________________________________________________________________________________________________________________________
+
+
+def create_sentiment_table(curr):
+    create_table_command = ("""CREATE TABLE IF NOT EXISTS comment_sentiment (
+                        key VARCHAR(255) PRIMARY KEY,
+                        flairSlow FLOAT,
+                        flairFast FLOAT,
+                        rating SMALLINT
+                )""")
+    curr.execute(create_table_command)
+
+
+def append_sentiment(curr, comdf_anal):
+    print('Uploading Sentiment Info')
+    records = comdf_anal.to_records(index=False)
+    comdf_anal_tuple = list(records)
+    execute_values(curr, "INSERT INTO comment_sentiment (key, flairSlow, flairFast, rating) VALUES %s", comdf_anal_tuple)
+
+
+def upload_sentiment_info(df_anal, comdf_anal, conn, curr):
+    if conn is None:
+        return df_anal, comdf_anal
+
+    try:
+        create_sentiment_table(curr)
+        append_sentiment(curr, comdf_anal)
+        print(f"Successfully Uploaded Sentiment Information On {len(comdf_anal)} Comments")
+    except Exception as e:
+        print(e)
+        print("No write privileges")
+        return df_anal, comdf_anal
+
+    conn.commit()
+    print("Changes successfully committed to database.")
+    return df_anal, comdf_anal
+
+# def append_new_comments(curr, comdf):
+#     print(f"Uploading comments. Estimated time to upload {len(comdf)} comments: {round(len(comdf) / 1600, 5)} seconds")
+#     start = time.perf_counter()
+#     records = comdf.to_records(index=False)
+#     comdf_tuple = list(records)
+#     execute_values(curr, "INSERT INTO comments (key, videoid, author, display_name, comment, like_count, upload_date) VALUES %s", comdf_tuple)
+#     end = time.perf_counter()
+#     print(f"Finished in {round(end - start, 6)} seconds. This corresponds to {(round(end - start, 6) / len(comdf)) * 1000} ms per comment.")
